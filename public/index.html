@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AT测试采集系统</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus/dist/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/element-plus/dist/index.full.js"></script>
+</head>
+<body>
+    <div id="app">
+        <el-container class="layout-container">
+            <!-- 头部 -->
+            <el-header>
+                <h1>AT测试采集系统</h1>
+                <div class="header-controls">
+                    <el-button type="success" @click="refreshStatus">刷新状态</el-button>
+                </div>
+            </el-header>
+
+            <!-- 主要内容区域 -->
+            <el-main>
+                <!-- 状态面板 -->
+                <el-card class="status-card">
+                    <template #header>
+                        <span>系统状态</span>
+                    </template>
+                    <div class="status-info">
+                        <el-descriptions :column="3" border>
+                            <el-descriptions-item label="系统状态">
+                                <el-tag :type="statusInfo.status === 'running' ? 'success' : 'danger'">
+                                    {{ statusInfo.status }}
+                                </el-tag>
+                            </el-descriptions-item>
+                            <el-descriptions-item label="启动时间">{{ statusInfo.timestamp }}</el-descriptions-item>
+                            <el-descriptions-item label="运行时长">{{ formatUptime(statusInfo.uptime) }}</el-descriptions-item>
+                        </el-descriptions>
+                    </div>
+                </el-card>
+
+                <!-- 控制面板 -->
+                <el-card class="control-card">
+                    <template #header>
+                        <span>控制面板</span>
+                    </template>
+                    <el-row :gutter="20">
+                        <el-col :span="8">
+                            <div class="control-item">
+                                <h3>设备选择</h3>
+                                <el-select v-model="selectedDevice" placeholder="选择设备" style="width: 100%;">
+                                    <el-option 
+                                        v-for="device in devices" 
+                                        :key="device" 
+                                        :label="device" 
+                                        :value="device">
+                                    </el-option>
+                                </el-select>
+                            </div>
+                        </el-col>
+                        <el-col :span="8">
+                            <div class="control-item">
+                                <h3>开始日期</h3>
+                                <el-date-picker
+                                    v-model="searchParams.startDate"
+                                    type="datetime"
+                                    placeholder="选择开始日期"
+                                    style="width: 100%;">
+                                </el-date-picker>
+                            </div>
+                        </el-col>
+                        <el-col :span="8">
+                            <div class="control-item">
+                                <h3>结束日期</h3>
+                                <el-date-picker
+                                    v-model="searchParams.endDate"
+                                    type="datetime"
+                                    placeholder="选择结束日期"
+                                    style="width: 100%;">
+                                </el-date-picker>
+                            </div>
+                        </el-col>
+                    </el-row>
+                    <el-row style="margin-top: 20px;">
+                        <el-col :span="24">
+                            <el-button type="primary" @click="fetchRecords">查询记录</el-button>
+                            <el-button type="success" @click="fetchReport">生成报表</el-button>
+                            <el-button type="warning" @click="exportExcel">导出Excel</el-button>
+                        </el-col>
+                    </el-row>
+                </el-card>
+
+                <!-- 统计摘要 -->
+                <el-card class="summary-card" v-if="summaryData">
+                    <template #header>
+                        <span>统计摘要</span>
+                    </template>
+                    <el-row :gutter="20">
+                        <el-col :span="6">
+                            <div class="summary-item" @click="filterByResult('all')" :class="{ 'active-filter': activeFilter === 'all' }">
+                                <h3>{{ summaryData.total }}</h3>
+                                <p>总测试数</p>
+                            </div>
+                        </el-col>
+                        <el-col :span="6">
+                            <div class="summary-item ok-summary" @click="filterByResult('OK')" :class="{ 'active-filter': activeFilter === 'OK' }">
+                                <h3>{{ summaryData.okCount }}</h3>
+                                <p>OK数量</p>
+                            </div>
+                        </el-col>
+                        <el-col :span="6">
+                            <div class="summary-item ng-summary" @click="filterByResult('NG')" :class="{ 'active-filter': activeFilter === 'NG' }">
+                                <h3>{{ summaryData.ngCount }}</h3>
+                                <p>NG数量</p>
+                            </div>
+                        </el-col>
+                        <el-col :span="6">
+                            <div class="summary-item rate-summary">
+                                <h3>{{ summaryData.okRate }}%</h3>
+                                <p>良率</p>
+                            </div>
+                        </el-col>
+                    </el-row>
+                </el-card>
+
+                <!-- 测试记录表格 -->
+                <el-card class="records-card">
+                    <template #header>
+                        <span>测试记录</span>
+                    </template>
+                    <el-table 
+                        :data="records" 
+                        stripe 
+                        style="width: 100%"
+                        v-loading="loading">
+                        <el-table-column prop="id" label="ID" width="80"></el-table-column>
+                        <el-table-column prop="device_name" label="设备名称" width="150"></el-table-column>
+                        <el-table-column prop="start_time" label="开始时间" width="180"></el-table-column>
+                        <el-table-column prop="end_time" label="结束时间" width="180"></el-table-column>
+                        <el-table-column prop="result" label="结果" width="100">
+                            <template #default="scope">
+                                <el-tag :type="scope.row.result === 'OK' ? 'success' : 'danger'">
+                                    {{ scope.row.result }}
+                                </el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="ng_count" label="NG数量" width="100"></el-table-column>
+                        <el-table-column prop="ok_count" label="OK数量" width="100"></el-table-column>
+                        <el-table-column prop="created_at" label="记录时间" width="180"></el-table-column>
+                        <el-table-column label="操作" width="100">
+                            <template #default="scope">
+                                <el-button size="small" type="primary" @click="showTestDetails(scope.row)">
+                                    详情
+                                </el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                    
+                    <!-- 分页 -->
+                    <el-pagination
+                        v-if="pagination.totalRecords > 0"
+                        @size-change="handleSizeChange"
+                        @current-change="handleCurrentChange"
+                        :current-page="pagination.currentPage"
+                        :page-sizes="[10, 20, 50, 100]"
+                        :page-size="pagination.pageSize"
+                        layout="total, sizes, prev, pager, next, jumper"
+                        :total="pagination.totalRecords">
+                    </el-pagination>
+                </el-card>
+            </el-main>
+        </el-container>
+        
+        <!-- 测试详情对话框 -->
+        <el-dialog v-model="detailDialogVisible" title="测试详情" width="80%" center>
+            <div v-if="testDetails">
+                <el-descriptions :column="2" border>
+                    <el-descriptions-item label="设备名称">{{ testDetails.deviceName }}</el-descriptions-item>
+                    <el-descriptions-item label="测试结果">
+                        <el-tag :type="testDetails.result === 'OK' ? 'success' : 'danger'">
+                            {{ testDetails.result }}
+                        </el-tag>
+                    </el-descriptions-item>
+                    <el-descriptions-item label="开始时间">{{ testDetails.startTime }}</el-descriptions-item>
+                    <el-descriptions-item label="结束时间">{{ testDetails.endTime }}</el-descriptions-item>
+                    <el-descriptions-item label="OK数量">{{ testDetails.okCount }}</el-descriptions-item>
+                    <el-descriptions-item label="NG数量">{{ testDetails.ngCount }}</el-descriptions-item>
+                </el-descriptions>
+                
+                <el-divider content-position="left">测试项目详情</el-divider>
+                
+                <el-table :data="testDetails.details" stripe style="width: 100%">
+                    <el-table-column prop="log_sequence" label="序号" width="80"></el-table-column>
+                    <el-table-column prop="test_time" label="测试时间" width="180"></el-table-column>
+                    <el-table-column prop="test_content" label="测试内容" width="200"></el-table-column>
+                    <el-table-column prop="test_result" label="结果" width="100">
+                        <template #default="scope">
+                            <el-tag :type="scope.row.test_result === 'OK' ? 'success' : 'danger'">
+                                {{ scope.row.test_result }}
+                            </el-tag>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="measured_value" label="测量值" width="100"></el-table-column>
+                    <el-table-column label="规格范围" width="200">
+                        <template #default="scope">
+                            {{ scope.row.spec_min }} - {{ scope.row.spec_max }}
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="状态" width="100">
+                        <template #default="scope">
+                            <el-tag :type="isValueInSpec(scope.row) ? 'success' : 'danger'">
+                                {{ isValueInSpec(scope.row) ? '合格' : '不合格' }}
+                            </el-tag>
+                        </template>
+                    </el-table-column>
+                </el-table>
+            </div>
+            <div v-else>
+                <el-empty description="暂无详情数据"></el-empty>
+            </div>
+        </el-dialog>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "name": "at-test-client-gui",
+  "version": "1.0.0",
+  "description": "AT测试采集客户端（带GUI界面）",
+  "main": "gui/main.js",
+  "scripts": {
+    "start": "electron gui/main.js",
+    "start-cli": "node client.js",
+    "start-simple": "node simple-client.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "keywords": [
+    "test",
+    "collection",
+    "at",
+    "log",
+    "client",
+    "gui"
+  ],
+  "author": "AT Test Client GUI",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "electron-is-dev": "^2.0.0"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  }
+}

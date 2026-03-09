@@ -32,6 +32,37 @@ npm install
 
 ### 启动Web版客户端
 
+#### 方式一：使用启动脚本（推荐）
+
+**简单启动**：
+```bash
+# 双击运行
+start-web.bat
+
+# 或在命令行中运行
+start-web.bat
+```
+
+**高级启动**：
+```bash
+# 双击运行
+start-web-advanced.bat
+
+# 或在命令行中运行
+start-web-advanced.bat
+```
+
+启动脚本特点：
+- ✅ 自动检查Node.js环境
+- ✅ 自动安装依赖包
+- ✅ 自动打开浏览器
+- ✅ 服务器状态检测
+- ✅ 友好的错误提示
+
+详细使用说明请参考：[START-SCRIPTS.md](START-SCRIPTS.md)
+
+#### 方式二：命令行启动
+
 ```bash
 # 启动Web版客户端
 npm run start-web
@@ -48,7 +79,7 @@ node web-client.js
 ### 配置客户端
 
 1. 在"客户端配置"区域填写必要信息：
-   - 设备名称：测试设备的唯一标识
+   - 设备名称：测试设备的唯一标识，**默认为本机IP地址**
    - 服务端地址：中央服务器的URL（建议使用HTTP而非HTTPS）
    - 日志目录：要监控的日志文件目录
    - 客户端ID：自动生成，通常使用主机名

@@ -456,6 +456,99 @@
         .notification.show {
             opacity: 1;
         }
+
+        /* 目录选择器样式 */
+        .directory-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .directory-breadcrumb {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+
+        .directory-list {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            min-height: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: #fff;
+        }
+
+        .directory-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .directory-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .directory-item.selected {
+            background-color: #e3f2fd;
+            border: 2px solid #2196f3;
+        }
+
+        .directory-item.drive {
+            background-color: #fff3e0;
+            border-left: 4px solid #ff9800;
+        }
+
+        .directory-item.drive:hover {
+            background-color: #ffe0b2;
+        }
+
+        .directory-item.drive.selected {
+            background-color: #e3f2fd;
+            border: 2px solid #2196f3;
+            border-left: 4px solid #ff9800;
+        }
+
+        .directory-item .icon {
+            margin-right: 10px;
+            font-size: 18px;
+        }
+
+        .directory-item .name {
+            flex: 1;
+        }
+
+        .directory-item .arrow {
+            color: #999;
+        }
+
+        .directory-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .directory-actions .btn {
+            min-width: 100px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            text-align: center;
+            padding: 20px;
+        }
     </style>
 </head>
 <body>
@@ -516,7 +609,7 @@
                 <div class="config-grid">
                     <div class="form-group">
                         <label for="deviceName">设备名称 *</label>
-                        <input type="text" id="deviceName" placeholder="设备名称，如：ATE-001">
+                        <input type="text" id="deviceName" placeholder="设备名称，默认为本机IP地址">
                     </div>
                     <div class="form-group">
                         <label for="clientId">客户端ID</label>
@@ -529,10 +622,8 @@
                     <div class="form-group">
                         <label for="logDir">日志目录 *</label>
                         <div style="display: flex; gap: 10px;">
-                            <input type="text" id="logDir" placeholder="选择日志目录" style="flex: 1;">
-                            <select id="logDirSelect" style="width: auto;">
-                                <option value="">选择预设目录</option>
-                            </select>
+                            <input type="text" id="logDir" placeholder="选择日志目录" style="flex: 1;" readonly>
+                            <button id="browseDirBtn" class="btn btn-refresh" type="button" style="white-space: nowrap;">浏览...</button>
                         </div>
                     </div>
                 </div>
@@ -580,6 +671,30 @@
                     </table>
                     <div id="noFailedItems" class="no-items-message" style="display: none;">
                         暂无失败项目
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 目录选择器弹窗 -->
+    <div id="directorySelectorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>选择日志目录</h2>
+                <span class="close" id="closeDirSelector">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="directory-selector">
+                    <div class="directory-breadcrumb">
+                        <span id="currentPath">/</span>
+                    </div>
+                    <div class="directory-list" id="directoryList">
+                        <div class="loading">加载中...</div>
+                    </div>
+                    <div class="directory-actions">
+                        <button id="selectDirBtn" class="btn btn-primary" disabled>选择此目录</button>
+                        <button id="cancelDirBtn" class="btn btn-secondary">取消</button>
                     </div>
                 </div>
             </div>

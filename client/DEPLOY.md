@@ -226,7 +226,7 @@ SERVER_URL=http://server:3000
 # 默认日志目录
 LOG_DIR=/path/to/logs
 
-# 默认设备名称
+# 默认设备名称（不设置则自动使用本机IP地址）
 CLIENT_NAME=TestDevice
 
 # 默认客户端ID

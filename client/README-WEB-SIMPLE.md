@@ -15,12 +15,21 @@ npm install
 
 #### Windows系统
 
-```bash
-# 运行部署脚本（推荐）
-deploy-windows.bat
+**方式一：使用启动脚本（推荐）**
 
-# 或者手动启动
-npm run start-web
+```bash
+# 简单启动
+start-web.bat
+
+# 高级启动（带菜单）
+start-web-advanced.bat
+```
+
+**方式二：使用部署脚本**
+
+```bash
+# 运行部署脚本
+deploy-windows.bat
 ```
 
 #### Linux/Mac系统
@@ -29,10 +38,10 @@ npm run start-web
 # 给脚本添加执行权限
 chmod +x deploy-linux.sh
 
-# 运行部署脚本（推荐）
+# 运行部署脚本
 ./deploy-linux.sh
 
-# 或者手动启动
+# 或者直接启动
 npm run start-web
 ```
 
@@ -40,6 +49,16 @@ npm run start-web
 
 - 本地访问：http://localhost:3002
 - 局域网访问：http://[计算机名]:3002
+
+### 4. 配置客户端
+
+1. 在"客户端配置"区域填写必要信息：
+   - 设备名称：测试设备的唯一标识，**默认为本机IP地址**
+   - 服务端地址：中央服务器的URL（建议使用HTTP而非HTTPS）
+   - 日志目录：点击"浏览..."按钮选择目录
+     - **Windows系统**：首先选择盘符（C:、D:等），然后浏览该盘符下的目录
+     - **Unix系统**：从根目录（/）开始浏览目录
+   - 客户端ID：自动生成，通常使用主机名
 
 ## 主要优势
 

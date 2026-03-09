@@ -5,7 +5,7 @@
 const deviceNameInput = document.getElementById('deviceName');
 const serverUrlInput = document.getElementById('serverUrl');
 const logDirInput = document.getElementById('logDir');
-const logDirSelect = document.getElementById('logDirSelect');
+const browseDirBtn = document.getElementById('browseDirBtn');
 const clientIdInput = document.getElementById('clientId');
 const startBtn = document.getElementById('startBtn');
 const stopBtn = document.getElementById('stopBtn');
@@ -27,6 +27,14 @@ const retryAllBtn = document.getElementById('retryAllBtn');
 const clearAllBtn = document.getElementById('clearAllBtn');
 const modalCloseBtn = document.querySelector('.close');
 
+// 目录选择器相关元素
+const directorySelectorModal = document.getElementById('directorySelectorModal');
+const closeDirSelector = document.getElementById('closeDirSelector');
+const directoryList = document.getElementById('directoryList');
+const currentPath = document.getElementById('currentPath');
+const selectDirBtn = document.getElementById('selectDirBtn');
+const cancelDirBtn = document.getElementById('cancelDirBtn');
+
 // 通知元素
 const notification = document.getElementById('notification');
 
@@ -42,23 +50,29 @@ let stats = {
 // 失败项目列表
 let failedItems = [];
 
+// 目录选择器状态
+let currentDirectoryPath = '';
+let selectedDirectory = '';
+
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
   // 加载配置
   loadConfig();
   
-  // 加载目录选项
-  loadDirectoryOptions();
-  
   // 绑定事件
   startBtn.addEventListener('click', startClient);
   stopBtn.addEventListener('click', stopClient);
   refreshBtn.addEventListener('click', refreshSystemInfo);
-  logDirSelect.addEventListener('change', selectLogDirectory);
+  browseDirBtn.addEventListener('click', showDirectorySelector);
   
   // 弹窗相关事件
   uploadsFailedEl.addEventListener('click', showFailedItemsModal);
   modalCloseBtn.addEventListener('click', hideFailedItemsModal);
+  
+  // 目录选择器相关事件
+  closeDirSelector.addEventListener('click', hideDirectorySelector);
+  cancelDirBtn.addEventListener('click', hideDirectorySelector);
+  selectDirBtn.addEventListener('click', selectDirectory);
   retryAllBtn.addEventListener('click', retryAllFailedItems);
   clearAllBtn.addEventListener('click', clearAllFailedItems);
   
@@ -92,25 +106,143 @@ async function loadConfig() {
   }
 }
 
-// 加载目录选项
-async function loadDirectoryOptions() {
+// 显示目录选择器
+async function showDirectorySelector() {
+  directorySelectorModal.style.display = 'block';
+  currentDirectoryPath = '';
+  selectedDirectory = '';
+  selectDirBtn.disabled = true;
+  await loadDirectories('');
+}
+
+// 隐藏目录选择器
+function hideDirectorySelector() {
+  directorySelectorModal.style.display = 'none';
+}
+
+// 加载目录列表
+async function loadDirectories(path) {
   try {
-    const response = await fetch('/api/directory-options');
-    const options = await response.json();
+    directoryList.innerHTML = '<div class="loading">加载中...</div>';
     
-    // 清空现有选项
-    logDirSelect.innerHTML = '<option value="">选择预设目录</option>';
+    const response = await fetch(`/api/directories?path=${encodeURIComponent(path)}`);
     
-    // 添加新选项
-    options.forEach(option => {
-      const optionElement = document.createElement('option');
-      optionElement.value = option.path;
-      optionElement.textContent = option.label;
-      logDirSelect.appendChild(optionElement);
-    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || '加载目录失败');
+    }
+    
+    const directories = await response.json();
+    currentDirectoryPath = path;
+    currentPath.textContent = path || '/';
+    
+    renderDirectoryList(directories);
   } catch (error) {
-    console.error('加载目录选项失败:', error);
-    addLog('error', `加载目录选项失败: ${error.message}`);
+    console.error('加载目录失败:', error);
+    directoryList.innerHTML = `<div class="error-message">加载失败: ${error.message}</div>`;
+  }
+}
+
+// 渲染目录列表
+function renderDirectoryList(directories) {
+  directoryList.innerHTML = '';
+  
+  // 检查是否是根目录（盘符列表）
+  const isRoot = !currentDirectoryPath;
+  
+  // 添加返回上级目录选项（如果不是根目录）
+  if (!isRoot) {
+    const parentPath = getParentPath(currentDirectoryPath);
+    const parentItem = document.createElement('div');
+    parentItem.className = 'directory-item';
+    parentItem.innerHTML = `
+      <span class="icon">📁</span>
+      <span class="name">.. (返回上级)</span>
+      <span class="arrow">←</span>
+    `;
+    parentItem.addEventListener('click', () => loadDirectories(parentPath));
+    directoryList.appendChild(parentItem);
+  }
+  
+  // 如果目录为空，显示提示信息
+  if (directories.length === 0) {
+    const emptyMessage = document.createElement('div');
+    emptyMessage.className = 'error-message';
+    emptyMessage.textContent = '此目录为空';
+    directoryList.appendChild(emptyMessage);
+    return;
+  }
+  
+  // 添加目录列表
+  directories.forEach(dir => {
+    const item = document.createElement('div');
+    item.className = 'directory-item';
+    item.dataset.path = dir.path;
+    
+    // 根据是否是盘符使用不同的图标和样式
+    const isDrive = dir.path.match(/^[A-Z]:\\$/);
+    const icon = isDrive ? '💾' : '📁';
+    const name = isDrive ? dir.name : dir.name;
+    
+    // 如果是盘符，添加特殊样式类
+    if (isDrive) {
+      item.classList.add('drive');
+    }
+    
+    item.innerHTML = `
+      <span class="icon">${icon}</span>
+      <span class="name">${name}</span>
+      <span class="arrow">→</span>
+    `;
+    item.addEventListener('click', () => {
+      // 清除之前的选择
+      document.querySelectorAll('.directory-item').forEach(el => el.classList.remove('selected'));
+      // 选择当前项
+      item.classList.add('selected');
+      selectedDirectory = dir.path;
+      selectDirBtn.disabled = false;
+    });
+    item.addEventListener('dblclick', () => loadDirectories(dir.path));
+    directoryList.appendChild(item);
+  });
+}
+
+// 获取父目录路径
+function getParentPath(path) {
+  const separator = path.includes('\\') ? '\\' : '/';
+  const parts = path.split(separator);
+  parts.pop();
+  return parts.join(separator);
+}
+
+// 选择目录
+async function selectDirectory() {
+  if (!selectedDirectory) {
+    showNotification('请先选择一个目录', 'warning');
+    return;
+  }
+  
+  try {
+    const response = await fetch('/api/validate-directory', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ path: selectedDirectory })
+    });
+    
+    const result = await response.json();
+    
+    if (result.valid) {
+      logDirInput.value = result.path;
+      hideDirectorySelector();
+      addLog('info', `已选择日志目录: ${result.path}`);
+    } else {
+      showNotification(`目录验证失败: ${result.error}`, 'error');
+    }
+  } catch (error) {
+    console.error('验证目录失败:', error);
+    showNotification(`验证目录失败: ${error.message}`, 'error');
   }
 }
 
@@ -306,7 +438,7 @@ async function refreshSystemInfo() {
     const response = await fetch('/api/system-info');
     const sysInfo = await response.json();
     
-    addLog('info', `系统信息 - 主机: ${sysInfo.hostname}, 平台: ${sysInfo.platform}, CPU: ${sysInfo.cpus}核, 内存: ${(sysInfo.totalmem / (1024**3)).toFixed(1)}GB`);
+    addLog('info', `系统信息 - 主机: ${sysInfo.hostname}, 本机IP: ${sysInfo.localIP}, 平台: ${sysInfo.platform}, CPU: ${sysInfo.cpus}核, 内存: ${(sysInfo.totalmem / (1024**3)).toFixed(1)}GB`);
     showNotification('系统信息已刷新', 'success');
   } catch (error) {
     console.error('刷新系统信息失败:', error);

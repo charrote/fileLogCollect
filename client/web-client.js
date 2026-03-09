@@ -38,6 +38,21 @@ const config = require('./config');
 const LogCollector = require('./LogCollector');
 const LogUploader = require('./LogUploader');
 
+// 获取本机IP地址的函数
+function getLocalIPAddress() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      // 跳过内部IP和IPv6地址
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  // 如果没有找到外部IP，返回localhost
+  return '127.0.0.1';
+}
+
 class WebClient {
   constructor() {
     this.app = express();
@@ -73,8 +88,10 @@ class WebClient {
   setupApiRoutes() {
     // 获取系统信息
     this.app.get('/api/system-info', (req, res) => {
+      const localIP = getLocalIPAddress();
       res.json({
         hostname: os.hostname(),
+        localIP: localIP,
         platform: os.platform(),
         arch: os.arch(),
         totalmem: os.totalmem(),
@@ -85,8 +102,11 @@ class WebClient {
     
     // 获取当前配置
     this.app.get('/api/config', (req, res) => {
+      const localIP = getLocalIPAddress();
+      // 设备名称默认为本机IP地址
+      const defaultDeviceName = process.env.CLIENT_NAME || localIP;
       res.json({
-        deviceName: process.env.CLIENT_NAME || config.client.name,
+        deviceName: defaultDeviceName,
         serverUrl: process.env.SERVER_URL || config.server.url,
         logDir: process.env.LOG_DIR || config.collector.logDir,
         clientId: process.env.CLIENT_ID || config.client.id
@@ -406,6 +426,106 @@ class WebClient {
           ];
       
       res.json(options);
+    });
+    
+    // 获取指定目录的子目录列表
+    this.app.get('/api/directories', async (req, res) => {
+      try {
+        const { path: dirPath } = req.query;
+        
+        if (!dirPath) {
+          // 如果没有指定路径，返回根目录（盘符列表）
+          const platform = os.platform();
+          let rootItems = [];
+          
+          if (platform === 'win32') {
+            // Windows系统，返回可用的驱动器列表
+            const possibleDrives = ['C:\\', 'D:\\', 'E:\\', 'F:\\', 'G:\\', 'H:\\'];
+            for (const drive of possibleDrives) {
+              try {
+                await fs.access(drive);
+                rootItems.push({
+                  name: drive.replace('\\', ''),
+                  path: drive,
+                  hasChildren: true
+                });
+              } catch (error) {
+                // 驱动器不可访问，跳过
+              }
+            }
+          } else {
+            // Unix系统，返回根目录
+            rootItems.push({
+              name: '/',
+              path: '/',
+              hasChildren: true
+            });
+          }
+          
+          res.json(rootItems);
+          return;
+        }
+        
+        // 检查目录是否存在
+        try {
+          const stats = await fs.stat(dirPath);
+          if (!stats.isDirectory()) {
+            return res.status(400).json({ error: '指定路径不是目录' });
+          }
+        } catch (error) {
+          return res.status(404).json({ error: '目录不存在' });
+        }
+        
+        // 读取目录内容
+        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+        
+        // 只返回目录
+        const directories = entries
+          .filter(entry => entry.isDirectory())
+          .map(entry => ({
+            name: entry.name,
+            path: path.join(dirPath, entry.name),
+            hasChildren: true
+          }));
+        
+        res.json(directories);
+      } catch (error) {
+        console.error('读取目录失败:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+    
+    // 验证目录是否可访问
+    this.app.post('/api/validate-directory', async (req, res) => {
+      try {
+        const { path: dirPath } = req.body;
+        
+        if (!dirPath) {
+          return res.status(400).json({ valid: false, error: '路径不能为空' });
+        }
+        
+        // 检查目录是否存在
+        try {
+          const stats = await fs.stat(dirPath);
+          if (!stats.isDirectory()) {
+            return res.json({ valid: false, error: '指定路径不是目录' });
+          }
+        } catch (error) {
+          return res.json({ valid: false, error: '目录不存在' });
+        }
+        
+        // 检查是否可读
+        try {
+          await fs.access(dirPath, fs.constants.R_OK);
+        } catch (error) {
+          return res.json({ valid: false, error: '目录不可读' });
+        }
+        
+        res.json({ valid: true, path: dirPath });
+      } catch (error) {
+        console.error('验证目录失败:', error);
+        res.status(500).json({ valid: false, error: error.message });
+      }
     });
   }
 

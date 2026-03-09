@@ -7,6 +7,7 @@
     "start": "electron gui/main.js",
     "start-cli": "node client.js",
     "start-simple": "node simple-client.js",
+    "start-web": "node web-client.js",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
   },
@@ -16,13 +17,15 @@
     "at",
     "log",
     "client",
-    "gui"
+    "gui",
+    "web"
   ],
   "author": "AT Test Client GUI",
   "license": "MIT",
   "dependencies": {
     "axios": "^1.6.0",
-    "electron-is-dev": "^2.0.0"
+    "electron-is-dev": "^2.0.0",
+    "express": "^4.18.2"
   },
   "devDependencies": {
     "electron": "^28.3.3",
